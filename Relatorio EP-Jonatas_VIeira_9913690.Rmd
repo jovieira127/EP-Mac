@@ -1,0 +1,307 @@
+---
+title: "Relatório do EP - MAC0113"
+author: 'Jonatas Vieira NUSP: 9913690 T21'
+date: "2023-07-06"
+output:
+  pdf_document: default
+---
+## Introdução
+O Índice Big Mac é um indicador econômico não convencional que compara o poder de compra de diferentes moedas. Ele usa o preço de um hambúrguer Big Mac, um produto globalmente padronizado, para revelar as disparidades das taxas de câmbio e avaliar as avaliações da moeda. Embora tenha limitações, o Índice Big Mac fornece informações sobre a paridade do poder de compra e é amplamente discutido na economia internacional.
+Este projeto visa criar um código, em R, onde seja possível estimar o índice Big Mac em diferentes anos e países, bem como definir gráficos comparativo desses indices para cada país.Além disso, a situação problema também tem como objetivo colocar em prática os assuntos abordados em aula, na disciplina MAC0113 -  Introdução à Computação para Ciências Humanas, colocando em prática o uso do conhecimento em um problema real.
+
+
+## Dados
+Os dados que serviram de base para o problema foram concedidos pelo professor da disciplina, que por sua vez fez a extração dos dados disponibilizados pela revista The Economist, e refletem o valor do sanduíche Big Mac da rede McDonald’s em diversos países e em diversos anos. Além disso, trazem informações como valor do câmbio do dólar no dia e o Produto Interno Bruto por pessoa (Gross Domestic Product) em dólar, conforme mostra a Tabela 1, que contem uma parte dos dados da base.
+
+```{r echo=FALSE, message = FALSE,  warning = FALSE}
+library(knitr)
+library(dplyr)
+BigMacData <- read.csv("C:/Users/Dell/Downloads/epData.csv", header = TRUE)
+parteBigMacData <- slice(BigMacData, 1:4)
+kable(parteBigMacData, caption = "Tabela 1")
+```
+
+
+Os dados estão distribuídos em um em um arquivo no formato .csv com 8 colunas, sendo que, para cada uma delas, é possível identificar o formato do dado associado, o número de observações e a quantidade de variáveis, por exemplo, conforme a Figura 1.
+
+Figura 1:
+```{r echo=FALSE, message = FALSE,  warning = FALSE}
+str(BigMacData)
+```
+
+
+## Método
+Para resolver o problema proposto, foram criadas algumas funções, que recebem parâmetros de entrada, executam operações e retornam valores de resultado, conforme mostrado abaixo. Com isso, as funções construídas foram utilizadas em vários trechos do EP, sem a necessidade de codificá-la novamente.
+
+A função da Figura 2, criaVetorAno, foi criada para receber um dataframe D como parâmetro e retornar um vetor com o ano de cada coleta do valor do Big Mac. Nela a data no formato DD-MM-AAAA, presente a coluna "date" da base de dados, foi dividida em "DD", "MM" e "AAAA", com o auxílio da  função strsplit e, posteriormente guardada em um vetor, com o auxilio da função unlist. Por fim, apenas o ano "AAAA" foi guardado em um novo vetor, retornando esse como resultado da função.
+
+Figura 2:
+```{r echo=TRUE} 
+criaVetorAno <- function(D){
+  dataSeparada <- character()
+  vetorAno <- character()
+  for(i in 1:nrow(D)){
+    dataSplit <- strsplit(D[i,"date"],split = "-")
+    dataSeparada <- unlist(list(dataSeparada,dataSplit))
+  }
+  #Colocando apenas o ano (AAAA) no vetorAno
+  for (i in seq(from = 1, to = length(dataSeparada), by = 3)) {
+    vetorAno <- c(vetorAno, dataSeparada[i])
+  }
+  return(vetorAno)
+}
+```
+A função da Figura 3, BigMacUSPrice, foi criada para receber um dataframe D e um ano A como parâmetro e retornar valor do Big Mac nos Estados Unidos naquele ano. Nela, foi analisada a coluna com o dado sobre a tripla de letras indicando o código do paıs, "isoA3", e, para os casos em que o codigo era "USA", a coluna "date" foi analisada com o auxilio da funcao da Figura 2, criaVetorAno, comparando o ano recebido como parâmetro do dataframe com o ano gerado pela funcao da Figura 2 e, caso esses anos fossem iguais, o valor da coluna "localPrice" é retornado como resultado da função.
+
+Figura 3:
+```{r echo=TRUE} 
+BigMacUSPrice <- function(D,A){
+  for(i in 1:nrow(D)){
+    if(D[i,"isoA3"]=="USA"){
+      vetorAno <- criaVetorAno(D)
+      if(vetorAno[i] == A){
+        precoBigMacEUA <- D[i,"localPrice"]
+      }
+    }
+  }
+  return(precoBigMacEUA)
+}
+```
+A função da Figura 4, mediaColunaPais, foi criada para receber um dataframe D, um código de país P e um número correspondente a uma coluna do dataframe C como parâmetro e retorna a média de todos os valores da coluna C cujo país é igual a P. Ela se inicia com a verificação da classe da coluna C e, caso fosse numérica, iniciaria o cálculo da média amostral, para as ocorrências em que a coluna "isoA3" fosse igual ao código do país de entrada como parâmetro da função. Esse cálculo foi realizado com o auxílio de um laço, que somava os valores da coluna C e, após percorrer as linhas do dataframe, dividia os valores somados pelo número de ocorrências. Caso a coluna C fosse numérica, o valor da média para essa de um dado país P é retornado como resultado da função. Caso contrário, o valor retornado é nulo.
+
+Figura 4:
+```{r echo=TRUE} 
+mediaColunaPais <- function(D,C,P){
+  #Verificando se a classe da coluna C é numérica
+  if(class(D[ , C]) == "numeric"){
+    soma <- as.numeric(0)
+    nAmostras <- as.numeric(0)
+    for(i in 1:nrow(D)){
+      if(D[i,"isoA3"] == P){
+        soma <- soma + D[i,C]
+        nAmostras <- nAmostras + 1
+      }
+    }
+    media <- soma/nAmostras
+  }else{
+    media <- NULL
+  }
+  return(media)
+}
+```
+A função da Figura 5, varColunaPais, foi criada para receber um dataframe D, um código de país P e um número correspondente a uma coluna do dataframe C como parâmetros e retorna a média de todos os valores da coluna C cujo país é igual a P. Ela se inicia com a verificação da classe da coluna C e, caso fosse numérica, iniciaria o cálculo da média amostral, com o auxílio da função da Figura 4. Para calcular a variância, para as ocorrências em que a coluna "isoA3" fosse igual ao código do país de entrada como parâmetro da função, foi utilizado um laço, que somava os valores do quadrado da subtração entre os valores coluna C e a média gerada pela funçao da figura 4 e, após percorrer as linhas do dataframe, dividia os valores somados pelo numero de ocorrencias - 1. Caso a coluna C fosse numérica, o valor da variância para essa de um dado país P é retornado como resultado da função. Caso contrário, o valor retornado é nulo.
+
+Figura 5:
+```{r echo=TRUE} 
+varColunaPais <- function(D,C,P){
+  if(class(D[ , C]) == "numeric"){
+    soma <- as.numeric(0)
+    nAmostras <- as.numeric(0)
+    mediaAmostral <- mediaColunaPais(D,C,P)
+    for(i in 1:nrow(D)){
+      if(D[i,"isoA3"] == P){
+        soma <- soma + (D[i,C] - mediaAmostral)^2
+        nAmostras <- nAmostras + 1
+      }
+    }
+    variancia <- soma/(nAmostras-1)
+  }else{
+    variancia <- NULL
+  }
+  return(variancia)
+}
+```
+A função da Figura 6, criaVetorBMI, foi criada para receber um dataframe D como parâmetro e retornar um vetor com o índice Big Mac de cada coleta do valor do Big Mac.
+Ela se inicia com a criação de um vetor, por meio do auxílio de um laço e da função da Figura 3, com todos os preços do Big Mac nos Estados Unidos entre os anos de 2000 e 2022. Após isso, um novo vetor foi criado, anoPreco, por meio do uso da função da Figura 2 e, com isso, foi possível criar um laço com o número de passagens igual ao número de linhas do dataframe. Também foi utilizada uma variável auxiliar, que tinha como objetivo garantir que todos os valores acessados em cada passo do laço fossem correspondentes a mesma linha do dataframe. 
+Uma comparação entre o anoPreco foi realizada com a variável auxiliar anoAnalisado, que parte do ano 2000,  a fim de garantir que o valor da coluna "localPrice" seria correspondente ao ano de uma dada linha do dataframe e, caso a comparação seja verdadeira, o Indice Big Mac era calculado por meio da divisão do "localPrice" da linha do dataframe e do preço do Big Mac nos Estados Unidos, no mesmo ano correspondente ao "localPrice" acessado. Vale ressaltar que para garantir que essa divisão fosse correta, foi criada uma variavel auxiliar idPrecoEUA, que tem como função acessar o valor exato do preço do Big Mac nos Estados Unidos para o ano correspondente ao preço local do Big Mac em um dado país. Caso a comparação entre anoPreco e anoAnalisado fosse falsa, o preço do Big Mac acessado era o do próximo ano, garantindo o cálculo do índice correto. Por fim, cada índice calculado era gravado em um vetor, que seria retornado como resultado da função.
+
+Figura 6:
+```{r echo=TRUE} 
+criaVetorBMI <- function(D){
+  precoEUA <- numeric()
+  #acessando cada valor do Big Mac para um ano entre 2000 e 2022
+  for(ano in 2000:2022){
+    precoEUA <- c(precoEUA, BigMacUSPrice(D, ano))
+  }
+  anoAnalisado <- 2000
+  idPrecoEUA <- 1
+  contador <- 1
+  anoPreco <- criaVetorAno(D)
+  indiceBigMac <- numeric()
+  
+  for(i in 1:length(anoPreco)){
+    #compara se o ano de um dado é o mesmo do analisado
+    if(anoPreco[contador] == (anoAnalisado) && anoAnalisado <= "2022"){
+      indice <- D[contador,"localPrice"]/precoEUA[idPrecoEUA]
+      indiceBigMac <- c(indiceBigMac, indice)
+      contador <- contador+1}else{
+        #caso o ano do dado for diferente, calcula levando em conta o valor
+        #do Big Mac do proximo ano
+        anoAnalisado <- anoAnalisado+1
+        idPrecoEUA <-idPrecoEUA+1
+        indice <- D[contador,"localPrice"]/precoEUA[idPrecoEUA]
+        indiceBigMac <- c(indiceBigMac, indice)
+        contador <- contador+1
+      }
+  }
+  return(indiceBigMac)
+}
+```
+A Figura 7 mostra outras duas funções criadas com intuito de reaproveitar o código, ou seja, nela é possível criar um vetor de variância (varianciaPaises) e indice Big Mac medio dos paises (indiceBigMacMedioPais) a partir dos parâmetros de entrada países, que é um vetor com os códigos dos países, coluna, que representa a coluna onde será feita a análise estatística, e o dataframe. A ideia surgiu com a necessidade de fazer esse cálculos 3 vezes para construir os gráficos pedidos no problema, ou seja, utilizar 3 vezes para cada uma das estatísticas a mesma estrutura de código. Porém, com o uso das funções, a estrutura foi codificada uma única vez. Os vetores de variância e índice Big Mac médio são retornados como resultado dessas funções para uma dada lista de código de países.
+
+Figura 7:
+```{r echo=TRUE} 
+#Reaproveitar o código do calculo da média do IBM para um vetor de paises
+indiceBigMacMedioPais <- function(paises,coluna,dataframe){
+  indiceBigMacMedio <- numeric()
+  for(i in 1:length(paises)){
+    indiceBigMacMedio <- c(indiceBigMacMedio, mediaColunaPais(dataframe,coluna,paises[i]))
+    indiceBigMacMedio <-round(indiceBigMacMedio, 3)
+  }
+  return(indiceBigMacMedio)
+}
+
+#Reaproveitar o código do calculo da variância do IBM para um vetor de paises
+varianciaPaises <- function(paises,coluna,dataframe){
+  varPaises <- numeric()
+  for(i in 1:length(paises)){
+    varPaises <- c(varPaises, varColunaPais(dataframe,coluna,paises[i]))
+    varPaises <-round(varPaises, 3)
+  }
+  return(varPaises)
+}
+```
+Para iniciar o programa, foi solicitado ao usuário o caminho de origem do arquivo .csv, que foi lido conforme mostra a Figura 8.
+
+Figura 8: 
+```{r echo=TRUE, eval = FALSE} 
+cat("Digite o caminho da base se dados: ")
+caminhoCSV <- readline()
+#past concatena a entrada do usuário com as aspas para leitura do arquivo
+BigMacData <- read.csv(paste(caminhoCSV, sep = ""), header = TRUE)
+```
+
+Após a leitura do arquivo, foram adicionadas duas colunas ao dataframe, com o uso da função cbind, contendo informações de ano e índice Big Mac, geradas pelo uso das funções das Figuras 2 e 6, respectivamente, conforme a Figura 9.
+
+Figura 9:
+```{r echo=TRUE, eval = FALSE} 
+#Adiciona 2 colunas de dados ao dataframe
+BigMacData <- cbind(BigMacData, Ano = criaVetorAno(BigMacData))
+BigMacData <- cbind(BigMacData, indiceBM = criaVetorBMI(BigMacData))
+```
+
+Por fim, a Figura 10 mostra a estrutura utilizada para gerar os gráficos solicitados no problema, com o uso das funções da Figura 7.
+
+Figura 10:
+```{r echo=TRUE, eval = FALSE} 
+#Gráficos para todos os países do dataframe
+barplot(indiceBigMacMedioPais(Paises,10,BigMacData),xlab= "Países",ylab="IBM médio", 
+        main="IBM médio dos Países", names.arg = Paises, cex.names = 0.3, las =2)
+
+barplot(varianciaPaises(Paises,10,BigMacData),xlab= "Países",ylab="Variância", 
+        main="Variância do IBM dos Países", names.arg = Paises, cex.names = 0.3, las =2)
+
+#Gráfico para os países que são classificados como "economias avançadas"(segundo o FMI)
+barplot(indiceBigMacMedioPais(paisesEconomiaAvancada,10,BigMacData),xlab= "Países",ylab="IBM médio", 
+        main="IBM médio dos Países de economia avançada", 
+        names.arg = paisesEconomiaAvancada, cex.names = 0.3, las =2)
+
+barplot(varianciaPaises(paisesEconomiaAvancada,10,BigMacData),xlab= "Países",ylab="Variância", 
+        main="Variância do IBM dos Países de economia avançada", 
+        names.arg = paisesEconomiaAvancada, cex.names = 0.3, las =2)
+
+#Gráfico para os outros países do dataframe
+barplot(indiceBigMacMedioPais(outrosPaises,10,BigMacData),xlab= "Países",ylab="IBM médio", 
+        main="IBM médio dos Países de economia não avançada", 
+        names.arg = outrosPaises, cex.names = 0.3, las =2)
+
+barplot(varianciaPaises(outrosPaises,10,BigMacData),xlab= "Países",ylab="Variância", 
+        main="Variância do IBM dos Países de economia não avançada", 
+        names.arg = outrosPaises, cex.names = 0.3, las =2)
+```
+
+## Resultados
+A Figura 11 mostra que o arquivo foi lido corretamente.
+
+Figura 11:
+```{r echo=FALSE} 
+ls.str(BigMacData)
+```
+```{r echo=FALSE} 
+#Adiciona 2 colunas de dados ao dataframe
+BigMacData <- cbind(BigMacData, Ano = criaVetorAno(BigMacData))
+BigMacData <- cbind(BigMacData, indiceBM = criaVetorBMI(BigMacData))
+```
+A Figura 12 mostra os agrupamentos para os vetores Paises, paisesEconomiaAvancada e outrosPaises, sendo o primeiro criado de acordo com as instruções do problema e o segundo e terceiro criado com base em dados do Fundo Monetário Internacional (FMI).
+
+Figura 12:
+```{r echo=FALSE} 
+#pega uma unica ocorrencia do país no dataframe
+Paises <- unique(sort(BigMacData[,"isoA3"]))
+cat("vetor Paises: \n")
+show(Paises)
+#vetor criado de acordo os  países e regiões que são classificados como "economias avançadas"(segundo o FMI)
+paisesEconomiaAvancada <- c("AUS", "AUT", "BEL", "CAN", "KOR", "DNK", "SVK", "SVN", "ESP", "USA", "EST", "FIN", "FRA", "GRC", "HKG", "IRL", "ISR", "ITA", "JPN", "LVA", "LTU", "NZL", "NOR", "NLD", "PRT", "GBR", "CZE", "SGP", "SWE", "CHE", "TWN")
+cat("vetor paisesEconomiaAvancada: \n")
+show(paisesEconomiaAvancada)
+#vetor com os demais países
+outrosPaises <- setdiff(Paises, paisesEconomiaAvancada)
+cat("vetor outrosPaises: \n")
+show(outrosPaises)
+```
+Para os países apresentados no dataframe, foi gerado o gráfico da Figura 13, mostrando o IBM médio dos Países. É possível observar que há pontos extremos, como o da Turquia, o que é confirmado pela variância do IBM dos Países, como mostra o gráfico da Figura 14.
+
+
+Figura 13:
+
+```{r echo=FALSE} 
+barplot(indiceBigMacMedioPais(Paises,10,BigMacData),xlab= "Países",ylab="IBM médio", main="IBM médio dos Países", names.arg = Paises, cex.names = 0.3, las =2)
+```
+
+Figura 14:
+
+```{r echo=FALSE} 
+barplot(varianciaPaises(Paises,10,BigMacData),xlab= "Países",ylab="Variância", main="Variância do IBM dos Países", names.arg = Paises, cex.names = 0.3, las =2)
+```
+
+Para os países de economia avançada, segundo o FMI, foi gerado o gráfico da Figura 15, mostrando o IBM médio. É possível observar que há pontos extremos, mesmo em economias avançadas, como o da Coréia do Sul, Japão e Taiwan. Ao analisar a variância do IBM países de economia avançada, é possível ver que o Japão e Coreia do Sul são pontos fora da curva, como mostra o gráfico da Figura 16, o que evidencia o distanciamento do valor médio do IBM para esses países.
+
+Figura 15:
+
+```{r echo=FALSE} 
+barplot(indiceBigMacMedioPais(paisesEconomiaAvancada,10,BigMacData),xlab= "Países",ylab="IBM médio", main="IBM médio dos Países de economia avançada", names.arg = paisesEconomiaAvancada, cex.names = 0.3, las =2)
+```
+
+Figura 16:
+
+```{r echo=FALSE} 
+barplot(varianciaPaises(paisesEconomiaAvancada,10,BigMacData),xlab= "Países",ylab="Variância", main="Variância do IBM dos Países de economia avançada", names.arg = paisesEconomiaAvancada, cex.names = 0.3, las =2)
+```
+
+Para os países de economia não avançada, segundo o FMI, foi gerado o gráfico da Figura 17, mostrando o IBM médio. É possível observar que há pontos extremos, mais destacados que os valores do gráfico equivalente anterior, como Turquia, Vietnã, Índia e Colômbia. Porém, ao analisar a variância do IBM países de economia nao avançada, é possível ver que o destaque fica para Turquia, como mostra o gráfico da Figura 18, o que evidencia o distanciamento significativo do valores de IBM, ao longo dos anos, do valor médio do IBM para esse país.
+
+Figura 17:
+
+```{r echo=FALSE} 
+barplot(indiceBigMacMedioPais(outrosPaises,10,BigMacData),xlab= "Países",ylab="IBM médio", main="IBM médio dos Países de economia não avançada", names.arg = outrosPaises, cex.names = 0.3, las =2)
+```
+
+Figura 18:
+
+```{r echo=FALSE} 
+barplot(varianciaPaises(outrosPaises,10,BigMacData),xlab= "Países",ylab="Variância", main="Variância do IBM dos Países de economia não avançada", names.arg = outrosPaises, cex.names = 0.3, las =2)
+```
+
+## Conclusão
+É possível concluir que o índice Big Mac (IBM) é um indicador que ilustra bem a disparidade do câmbio do dólar para moedas de outros países. Alguns casos ficaram em destaque, conforme mostrado nos resultados, principalmente para países de economia não avançada, como a Turquia, Vietnã, Índia e Colômbia. Porém, vale destacar que para os países de economia avançada, há também países com alta disparidade de câmbio em ralação ao dólar, como Coréia do Sul, Japão e Taiwan. A variância do IBM, principalmente para a Coréia do Sul e Japão, reforçam ainda mais a volatidade da moeda desses países, além do baixo poder de compra no mercado internacional.
+
+O a situação problema possibilitou, também, a consolidação das dinâmicas aprendidas em aula, na medida em que colocou em prática os seguintes pontos da disciplina:
+
+* Uso de conceitos looping no R;
+* Criação de condições no R;
+* Conceito de funções e reuso de código;
+* Como transferir um problema real para linguagem computacional;
+
+Esses e outros conceitos técnicos foram fundamentais para obter o resultado esperado pelo exercício.
+
+Por fim, para uma próxima versão do código, faz-se necessário a avaliação do IBM com a retirada dos países geradores de pontos extremos nos gráficos, além de uma reordenação para que seja levado em consideração os países com moedas que estão valorizadas em relação ao dólar no período de análise, possibilitando, assim, uma avaliação mais completa do IBM para todos os países que compõe o dataframe.
